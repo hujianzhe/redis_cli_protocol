@@ -1,0 +1,5 @@
+.gitattributes
+*.a
+*.so
+tags
+/*.dSYM
