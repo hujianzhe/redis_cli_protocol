@@ -142,7 +142,7 @@ typedef struct redisReader {
 extern "C" {
 #endif
 
-__declspec_dll hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha);
+__declspec_dll hiredisAllocFuncs hiredisSetAllocators(const hiredisAllocFuncs *ha);
 __declspec_dll void hiredisResetAllocators(void);
 
 __declspec_dll redisReader *redisReaderCreate(void);

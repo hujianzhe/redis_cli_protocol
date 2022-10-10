@@ -1470,7 +1470,7 @@ oom:
 extern "C" {
 #endif
 
-hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha) {
+hiredisAllocFuncs hiredisSetAllocators(const hiredisAllocFuncs *ha) {
     hiredisAllocFuncs orig = s_hiredisAllocFns;
     s_hiredisAllocFns = *ha;
     return orig;
