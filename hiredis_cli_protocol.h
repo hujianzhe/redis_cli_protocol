@@ -29,6 +29,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* All Code is from HIREDIS
+ * https://github.com/redis/hiredis
+ *
+ * hiredis version:
+ *
+#define HIREDIS_MAJOR 1
+#define HIREDIS_MINOR 0
+#define HIREDIS_PATCH 3
+#define HIREDIS_SONAME 1.0.3-dev
+ */
+
 #ifndef __HIREDIS_CLI_PROTOCOL_H
 #define __HIREDIS_CLI_PROTOCOL_H
 
@@ -86,6 +97,15 @@
 /* Default multi-bulk element limit */
 #define REDIS_READER_MAX_ARRAY_ELEMENTS ((1LL<<32) - 1)
 
+/* Structure pointing to our actually configured allocators */
+typedef struct hiredisAllocFuncs {
+    void *(*mallocFn)(size_t);
+    void *(*callocFn)(size_t,size_t);
+    void *(*reallocFn)(void*,size_t);
+    char *(*strdupFn)(const char*);
+    void (*freeFn)(void*);
+} hiredisAllocFuncs;
+
 /* This is the reply object */
 typedef struct redisReply {
     int type; /* REDIS_REPLY_* */
@@ -127,6 +147,9 @@ typedef struct redisReader {
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+__declspec_dll hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha);
+__declspec_dll void hiredisResetAllocators(void);
 
 __declspec_dll redisReader *redisReaderCreate(void);
 __declspec_dll void redisReaderFree(redisReader *r);
