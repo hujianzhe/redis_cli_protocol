@@ -52,7 +52,6 @@
 #pragma warning(disable:4996)
 
 #define __attribute__(x)
-#define SDS_SSIZE_MAX (LLONG_MAX >> 1) /* why >> 1 ??? */
 
 #ifndef strcasecmp
 #define strcasecmp stricmp
@@ -89,7 +88,6 @@ static int c99_snprintf(char* str, size_t size, const char* format, ...)
 #else
 
 #include <strings.h>
-#define	SDS_SSIZE_MAX SSIZE_MAX
 
 #endif
 
@@ -157,8 +155,6 @@ static void hi_free(void *ptr) {
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#define SDS_MAX_PREALLOC 1048576 /* (1024*1024) */
 
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
  * However is here to document the layout of type 5 SDS strings. */
@@ -413,6 +409,7 @@ static char* sdsMakeRoomFor(char* s, size_t addlen) {
     size_t len, newlen, reqlen;
     char type, oldtype = s[-1] & SDS_TYPE_MASK;
     int hdrlen;
+	const size_t SDS_MAX_PREALLOC = 1048576; /* (1024*1024) */
 
     /* Return ASAP if there is enough space left. */
     if (avail >= addlen) return s;
@@ -538,7 +535,6 @@ static char* sdscatvprintf(char* s, const char *fmt, va_list ap) {
  */
 static int sdsrange(char* s, intptr_t start, intptr_t end) {
     size_t newlen, len = sdslen(s);
-    if (len > SDS_SSIZE_MAX) return -1;
 
     if (len == 0) return 0;
     if (start < 0) {
@@ -1458,8 +1454,8 @@ static redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn
     }
 
     r->fn = fn;
-    r->maxbuf = REDIS_READER_MAX_BUF;
-    r->maxelements = REDIS_READER_MAX_ARRAY_ELEMENTS;
+    r->maxbuf = 16384; /* 1024*16 */
+    r->maxelements = 0xffffffff;
     r->ridx = -1;
 
     return r;
