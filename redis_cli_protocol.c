@@ -1009,7 +1009,7 @@ void redisReaderFree(redisReader *r) {
 }
 
 int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
-    sds newbuf;
+    char* newbuf;
 
     /* Return early when this reader is in an erroneous state. */
     if (r->err)
@@ -1100,7 +1100,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     const char *c = format;
     char *cmd = NULL; /* final command */
     int pos; /* position in final command */
-    sds curarg, newarg; /* current argument */
+    char* curarg, *newarg; /* current argument */
     int touched = 0; /* was the current argument touched? */
     char **curargv = NULL, **newargv = NULL;
     int argc = 0;

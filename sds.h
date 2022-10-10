@@ -36,25 +36,25 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-typedef char *sds;
+/*typedef char *sds;*/
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-size_t sdslen(const sds s);
-size_t sdsavail(const sds s);
-void sdssetlen(sds s, size_t newlen);
-void sdssetalloc(sds s, size_t newlen);
+size_t sdslen(const char* s);
+size_t sdsavail(const char* s);
+void sdssetlen(char* s, size_t newlen);
+void sdssetalloc(char* s, size_t newlen);
 
-sds sdsnewlen(const void *init, size_t initlen);
-sds sdsempty(void);
-void sdsfree(sds s);
-sds sdscatlen(sds s, const void *t, size_t len);
-sds sdscat(sds s, const char *t);
-sds sdscatvprintf(sds s, const char *fmt, va_list ap);
+char* sdsnewlen(const void *init, size_t initlen);
+char* sdsempty(void);
+void sdsfree(char* s);
+char* sdscatlen(char* s, const void *t, size_t len);
+char* sdscat(char* s, const char *t);
+char* sdscatvprintf(char* s, const char *fmt, va_list ap);
 
-int sdsrange(sds s, intptr_t start, intptr_t end);
+int sdsrange(char* s, intptr_t start, intptr_t end);
 
 #ifdef __cplusplus
 }

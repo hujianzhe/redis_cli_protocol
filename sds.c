@@ -122,7 +122,7 @@ static char sdsReqType(size_t string_size) {
 extern "C" {
 #endif
 
-size_t sdslen(const sds s) {
+size_t sdslen(const char* s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -139,7 +139,7 @@ size_t sdslen(const sds s) {
     return 0;
 }
 
-size_t sdsavail(const sds s) {
+size_t sdsavail(const char* s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5: {
@@ -165,7 +165,7 @@ size_t sdsavail(const sds s) {
     return 0;
 }
 
-void sdssetlen(sds s, size_t newlen) {
+void sdssetlen(char* s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -189,7 +189,7 @@ void sdssetlen(sds s, size_t newlen) {
     }
 }
 
-void sdssetalloc(sds s, size_t newlen) {
+void sdssetalloc(char* s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -222,9 +222,9 @@ void sdssetalloc(sds s, size_t newlen) {
  * You can print the string with printf() as there is an implicit \0 at the
  * end of the string. However the string is binary safe and can contain
  * \0 characters in the middle, as the length is stored in the sds header. */
-sds sdsnewlen(const void *init, size_t initlen) {
+char* sdsnewlen(const void *init, size_t initlen) {
     void *sh;
-    sds s;
+    char* s;
     char type = sdsReqType(initlen);
     /* Empty strings are usually created in order to append. Use type 8
      * since type 5 is not good at this. */
@@ -281,12 +281,12 @@ sds sdsnewlen(const void *init, size_t initlen) {
 
 /* Create an empty (zero length) sds string. Even in this case the string
  * always has an implicit null term. */
-sds sdsempty(void) {
+char* sdsempty(void) {
     return sdsnewlen("",0);
 }
 
 /* Free an sds string. No operation is performed if 's' is NULL. */
-void sdsfree(sds s) {
+void sdsfree(char* s) {
     if (s == NULL) return;
     hi_free((char*)s-sdsHdrSize(s[-1]));
 }
@@ -297,7 +297,7 @@ void sdsfree(sds s) {
  *
  * Note: this does not change the *length* of the sds string as returned
  * by sdslen(), but only the free buffer space we have. */
-static sds sdsMakeRoomFor(sds s, size_t addlen) {
+static char* sdsMakeRoomFor(char* s, size_t addlen) {
     void *sh, *newsh;
     size_t avail = sdsavail(s);
     size_t len, newlen, reqlen;
@@ -349,7 +349,7 @@ static sds sdsMakeRoomFor(sds s, size_t addlen) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
-sds sdscatlen(sds s, const void *t, size_t len) {
+char* sdscatlen(char* s, const void *t, size_t len) {
     size_t curlen = sdslen(s);
 
     s = sdsMakeRoomFor(s,len);
@@ -364,12 +364,12 @@ sds sdscatlen(sds s, const void *t, size_t len) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
-sds sdscat(sds s, const char *t) {
+char* sdscat(char* s, const char *t) {
     return sdscatlen(s, t, strlen(t));
 }
 
 /* Like sdscatprintf() but gets va_list instead of being variadic. */
-sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
+char* sdscatvprintf(char* s, const char *fmt, va_list ap) {
     va_list cpy;
     char staticbuf[1024], *buf = staticbuf, *t;
     size_t buflen = strlen(fmt)*2;
@@ -426,7 +426,7 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
  * s = sdsnew("Hello World");
  * sdsrange(s,1,-1); => "ello World"
  */
-int sdsrange(sds s, intptr_t start, intptr_t end) {
+int sdsrange(char* s, intptr_t start, intptr_t end) {
     size_t newlen, len = sdslen(s);
     if (len > SDS_SSIZE_MAX) return -1;
 
