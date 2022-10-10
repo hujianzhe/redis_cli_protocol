@@ -92,7 +92,7 @@ static int c99_snprintf(char* str, size_t size, const char* format, ...)
 #endif
 
 /* hiredis allocator */
-static hiredisAllocFuncs s_hiredisAllocFns = {
+static RedisProtocolAllocFuncs_t s_hiredisAllocFns = {
     malloc,
     calloc,
     realloc,
@@ -562,31 +562,31 @@ static int sdsrange(char* s, intptr_t start, intptr_t end) {
     return 0;
 }
 
-/* Struct redisReader inner detail define */
+/* Struct RedisReplyReader inner detail define */
 
-typedef struct redisReadTask {
+typedef struct RedisReplyReadTask_t {
     int type;
     long long elements; /* number of elements in multibulk container */
     int idx; /* index in parent (array) object */
     void *obj; /* holds user-generated value for a read task */
-    struct redisReadTask *parent; /* parent task */
+    struct RedisReplyReadTask_t *parent; /* parent task */
     void *privdata; /* user-settable arbitrary field */
-} redisReadTask;
+} RedisReplyReadTask_t;
 
-typedef struct redisReplyObjectFunctions {
-    void *(*createString)(const redisReadTask*, char*, size_t);
-    void *(*createArray)(const redisReadTask*, size_t);
-    void *(*createInteger)(const redisReadTask*, long long);
-    void *(*createDouble)(const redisReadTask*, double, char*, size_t);
-    void *(*createNil)(const redisReadTask*);
-    void *(*createBool)(const redisReadTask*, int);
+typedef struct RedisReplyObjectFunctions_t {
+    void *(*createString)(const RedisReplyReadTask_t*, char*, size_t);
+    void *(*createArray)(const RedisReplyReadTask_t*, size_t);
+    void *(*createInteger)(const RedisReplyReadTask_t*, long long);
+    void *(*createDouble)(const RedisReplyReadTask_t*, double, char*, size_t);
+    void *(*createNil)(const RedisReplyReadTask_t*);
+    void *(*createBool)(const RedisReplyReadTask_t*, int);
     void (*freeObject)(void*);
-} redisReplyObjectFunctions;
+} RedisReplyObjectFunctions_t;
 
 /* Initial size of our nested reply stack and how much we grow it when needd */
 #define REDIS_READER_STACK_SIZE 9
 
-static void __redisReaderSetError(redisReader *r, int type, const char *str) {
+static void __redisReaderSetError(RedisReplyReader_t *r, int type, const char *str) {
     size_t len;
 
     if (r->reply != NULL && r->fn && r->fn->freeObject) {
@@ -634,7 +634,7 @@ static size_t chrtos(char *buf, size_t size, char byte) {
     return len;
 }
 
-static void __redisReaderSetErrorProtocolByte(redisReader *r, char byte) {
+static void __redisReaderSetErrorProtocolByte(RedisReplyReader_t *r, char byte) {
     char cbuf[8], sbuf[128];
 
     chrtos(cbuf,sizeof(cbuf),byte);
@@ -643,11 +643,11 @@ static void __redisReaderSetErrorProtocolByte(redisReader *r, char byte) {
     __redisReaderSetError(r,REDIS_ERR_PROTOCOL,sbuf);
 }
 
-static void __redisReaderSetErrorOOM(redisReader *r) {
+static void __redisReaderSetErrorOOM(RedisReplyReader_t *r) {
     __redisReaderSetError(r,REDIS_ERR_OOM,"Out of memory");
 }
 
-static char *readBytes(redisReader *r, unsigned int bytes) {
+static char *readBytes(RedisReplyReader_t *r, unsigned int bytes) {
     char *p;
     if (r->len-r->pos >= bytes) {
         p = r->buf+r->pos;
@@ -758,7 +758,7 @@ static int string2ll(const char *s, size_t slen, long long *value) {
     return REDIS_OK;
 }
 
-static char *readLine(redisReader *r, int *_len) {
+static char *readLine(RedisReplyReader_t *r, int *_len) {
     char *p, *s;
     int len;
 
@@ -773,8 +773,8 @@ static char *readLine(redisReader *r, int *_len) {
     return NULL;
 }
 
-static void moveToNextTask(redisReader *r) {
-    redisReadTask *cur, *prv;
+static void moveToNextTask(RedisReplyReader_t *r) {
+    RedisReplyReadTask_t *cur, *prv;
     while (r->ridx >= 0) {
         /* Return a.s.a.p. when the stack is now empty. */
         if (r->ridx == 0) {
@@ -801,8 +801,8 @@ static void moveToNextTask(redisReader *r) {
     }
 }
 
-static int processLineItem(redisReader *r) {
-    redisReadTask *cur = r->task[r->ridx];
+static int processLineItem(RedisReplyReader_t *r) {
+    RedisReplyReadTask_t *cur = r->task[r->ridx];
     void *obj;
     char *p;
     int len;
@@ -927,8 +927,8 @@ static int processLineItem(redisReader *r) {
     return REDIS_ERR;
 }
 
-static int processBulkItem(redisReader *r) {
-    redisReadTask *cur = r->task[r->ridx];
+static int processBulkItem(RedisReplyReader_t *r) {
+    RedisReplyReadTask_t *cur = r->task[r->ridx];
     void *obj = NULL;
     char *p, *s;
     long long len;
@@ -999,13 +999,13 @@ static int processBulkItem(redisReader *r) {
     return REDIS_ERR;
 }
 
-static int redisReaderGrow(redisReader *r) {
-    redisReadTask **aux;
+static int redisReaderGrow(RedisReplyReader_t *r) {
+    RedisReplyReadTask_t **aux;
     int newlen;
 
     /* Grow our stack size */
     newlen = r->tasks + REDIS_READER_STACK_SIZE;
-    aux = (redisReadTask**)hi_realloc(r->task, sizeof(*r->task) * newlen);
+    aux = (RedisReplyReadTask_t**)hi_realloc(r->task, sizeof(*r->task) * newlen);
     if (aux == NULL)
         goto oom;
 
@@ -1013,7 +1013,7 @@ static int redisReaderGrow(redisReader *r) {
 
     /* Allocate new tasks */
     for (; r->tasks < newlen; r->tasks++) {
-        r->task[r->tasks] = (redisReadTask*)hi_calloc(1, sizeof(**r->task));
+        r->task[r->tasks] = (RedisReplyReadTask_t*)hi_calloc(1, sizeof(**r->task));
         if (r->task[r->tasks] == NULL)
             goto oom;
     }
@@ -1025,8 +1025,8 @@ oom:
 }
 
 /* Process the array, map and set types. */
-static int processAggregateItem(redisReader *r) {
-    redisReadTask *cur = r->task[r->ridx];
+static int processAggregateItem(RedisReplyReader_t *r) {
+    RedisReplyReadTask_t *cur = r->task[r->ridx];
     void *obj;
     char *p;
     long long elements;
@@ -1103,8 +1103,8 @@ static int processAggregateItem(redisReader *r) {
     return REDIS_ERR;
 }
 
-static int processItem(redisReader *r) {
-    redisReadTask *cur = r->task[r->ridx];
+static int processItem(RedisReplyReader_t *r) {
+    RedisReplyReadTask_t *cur = r->task[r->ridx];
     char *p;
 
     /* check if we need to read type */
@@ -1185,8 +1185,8 @@ static int processItem(redisReader *r) {
 }
 
 /* Create a reply object */
-static redisReply *createReplyObject(int type) {
-    redisReply *r = (redisReply*)hi_calloc(1,sizeof(*r));
+static RedisReply_t *createReplyObject(int type) {
+    RedisReply_t *r = (RedisReply_t*)hi_calloc(1,sizeof(*r));
 
     if (r == NULL)
         return NULL;
@@ -1197,7 +1197,7 @@ static redisReply *createReplyObject(int type) {
 
 /* Free a reply object */
 static void freeReplyObject(void *reply) {
-    redisReply *r = (redisReply*)reply;
+    RedisReply_t *r = (RedisReply_t*)reply;
     size_t j;
 
     if (r == NULL)
@@ -1233,8 +1233,8 @@ static void freeReplyObject(void *reply) {
 /* Default set of functions to build the reply. Keep in mind that such a
  * function returning NULL is interpreted as OOM. */
 
-static void *createStringObject(const redisReadTask *task, char *str, size_t len) {
-    redisReply *r, *parent;
+static void *createStringObject(const RedisReplyReadTask_t *task, char *str, size_t len) {
+    RedisReply_t *r, *parent;
     char *buf;
 
     r = createReplyObject(task->type);
@@ -1268,7 +1268,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     r->str = buf;
 
     if (task->parent) {
-        parent = (redisReply*)task->parent->obj;
+        parent = (RedisReply_t*)task->parent->obj;
         /*assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_SET ||
@@ -1282,15 +1282,15 @@ oom:
     return NULL;
 }
 
-static void *createArrayObject(const redisReadTask *task, size_t elements) {
-    redisReply *r, *parent;
+static void *createArrayObject(const RedisReplyReadTask_t *task, size_t elements) {
+    RedisReply_t *r, *parent;
 
     r = createReplyObject(task->type);
     if (r == NULL)
         return NULL;
 
     if (elements > 0) {
-        r->element = (redisReply**)hi_calloc(elements,sizeof(redisReply*));
+        r->element = (RedisReply_t**)hi_calloc(elements,sizeof(RedisReply_t*));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
@@ -1300,7 +1300,7 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
     r->elements = elements;
 
     if (task->parent) {
-        parent = (redisReply*)task->parent->obj;
+        parent = (RedisReply_t*)task->parent->obj;
         /*assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_SET ||
@@ -1310,8 +1310,8 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
     return r;
 }
 
-static void *createIntegerObject(const redisReadTask *task, long long value) {
-    redisReply *r, *parent;
+static void *createIntegerObject(const RedisReplyReadTask_t *task, long long value) {
+    RedisReply_t *r, *parent;
 
     r = createReplyObject(REDIS_REPLY_INTEGER);
     if (r == NULL)
@@ -1320,7 +1320,7 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
     r->integer = value;
 
     if (task->parent) {
-        parent = (redisReply*)task->parent->obj;
+        parent = (RedisReply_t*)task->parent->obj;
         /*assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_SET ||
@@ -1330,8 +1330,8 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
     return r;
 }
 
-static void *createDoubleObject(const redisReadTask *task, double value, char *str, size_t len) {
-    redisReply *r, *parent;
+static void *createDoubleObject(const RedisReplyReadTask_t *task, double value, char *str, size_t len) {
+    RedisReply_t *r, *parent;
 
     r = createReplyObject(REDIS_REPLY_DOUBLE);
     if (r == NULL)
@@ -1354,7 +1354,7 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
     r->len = len;
 
     if (task->parent) {
-        parent = (redisReply*)task->parent->obj;
+        parent = (RedisReply_t*)task->parent->obj;
         /*assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_SET ||
@@ -1364,15 +1364,15 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
     return r;
 }
 
-static void *createNilObject(const redisReadTask *task) {
-    redisReply *r, *parent;
+static void *createNilObject(const RedisReplyReadTask_t *task) {
+    RedisReply_t *r, *parent;
 
     r = createReplyObject(REDIS_REPLY_NIL);
     if (r == NULL)
         return NULL;
 
     if (task->parent) {
-        parent = (redisReply*)task->parent->obj;
+        parent = (RedisReply_t*)task->parent->obj;
         /*assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_SET ||
@@ -1382,8 +1382,8 @@ static void *createNilObject(const redisReadTask *task) {
     return r;
 }
 
-static void *createBoolObject(const redisReadTask *task, int bval) {
-    redisReply *r, *parent;
+static void *createBoolObject(const RedisReplyReadTask_t *task, int bval) {
+    RedisReply_t *r, *parent;
 
     r = createReplyObject(REDIS_REPLY_BOOL);
     if (r == NULL)
@@ -1392,7 +1392,7 @@ static void *createBoolObject(const redisReadTask *task, int bval) {
     r->integer = bval != 0;
 
     if (task->parent) {
-        parent = (redisReply*)task->parent->obj;
+        parent = (RedisReply_t*)task->parent->obj;
         /*assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_SET ||
@@ -1402,7 +1402,7 @@ static void *createBoolObject(const redisReadTask *task, int bval) {
     return r;
 }
 
-static redisReplyObjectFunctions s_defaultFunctions = {
+static RedisReplyObjectFunctions_t s_defaultFunctions = {
     createStringObject,
     createArrayObject,
     createIntegerObject,
@@ -1432,10 +1432,10 @@ static size_t bulklen(size_t len) {
 }
 
 /* Create a reader object */
-static redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
-    redisReader *r;
+static RedisReplyReader_t *redisReaderCreateWithFunctions(const RedisReplyObjectFunctions_t *fn) {
+    RedisReplyReader_t *r;
 
-    r = (redisReader*)hi_calloc(1,sizeof(redisReader));
+    r = (RedisReplyReader_t*)hi_calloc(1,sizeof(RedisReplyReader_t));
     if (r == NULL)
         return NULL;
 
@@ -1443,12 +1443,12 @@ static redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn
     if (r->buf == NULL)
         goto oom;
 
-    r->task = (redisReadTask**)hi_calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
+    r->task = (RedisReplyReadTask_t**)hi_calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
     if (r->task == NULL)
         goto oom;
 
     for (; r->tasks < REDIS_READER_STACK_SIZE; r->tasks++) {
-        r->task[r->tasks] = (redisReadTask*)hi_calloc(1, sizeof(**r->task));
+        r->task[r->tasks] = (RedisReplyReadTask_t*)hi_calloc(1, sizeof(**r->task));
         if (r->task[r->tasks] == NULL)
             goto oom;
     }
@@ -1460,7 +1460,7 @@ static redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn
 
     return r;
 oom:
-    redisReaderFree(r);
+    RedisReplyReader_free(r);
     return NULL;
 }
 
@@ -1470,13 +1470,13 @@ oom:
 extern "C" {
 #endif
 
-hiredisAllocFuncs hiredisSetAllocators(const hiredisAllocFuncs *ha) {
-    hiredisAllocFuncs orig = s_hiredisAllocFns;
+RedisProtocolAllocFuncs_t RedisProtocolAllocFuncs_set(const RedisProtocolAllocFuncs_t *ha) {
+    RedisProtocolAllocFuncs_t orig = s_hiredisAllocFns;
     s_hiredisAllocFns = *ha;
     return orig;
 }
 
-void hiredisResetAllocators(void) {
+void RedisProtocolAllocFuncs_reset(void) {
     s_hiredisAllocFns.mallocFn = malloc;
     s_hiredisAllocFns.callocFn = calloc;
     s_hiredisAllocFns.reallocFn = realloc;
@@ -1484,11 +1484,11 @@ void hiredisResetAllocators(void) {
     s_hiredisAllocFns.freeFn = free;
 }
 
-redisReader *redisReaderCreate(void) {
+RedisReplyReader_t *RedisReplyReader_create(void) {
     return redisReaderCreateWithFunctions(&s_defaultFunctions);
 }
 
-void redisReaderFree(redisReader *r) {
+void RedisReplyReader_free(RedisReplyReader_t *r) {
     if (r == NULL)
         return;
 
@@ -1508,7 +1508,7 @@ void redisReaderFree(redisReader *r) {
     hi_free(r);
 }
 
-int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
+int RedisReplyReader_feed(RedisReplyReader_t *r, const char *buf, size_t len) {
     char* newbuf;
 
     /* Return early when this reader is in an erroneous state. */
@@ -1539,7 +1539,7 @@ oom:
     return REDIS_ERR;
 }
 
-int redisReaderGetReply(redisReader *r, redisReply **reply) {
+int RedisReplyReader_pop_reply(RedisReplyReader_t *r, RedisReply_t **reply) {
     /* Default target pointer to NULL. */
     if (reply != NULL)
         *reply = NULL;
@@ -1583,7 +1583,7 @@ int redisReaderGetReply(redisReader *r, redisReply **reply) {
     /* Emit a reply when there is one. */
     if (r->ridx == -1) {
         if (reply != NULL) {
-            *reply = (redisReply*)r->reply;
+            *reply = (RedisReply_t*)r->reply;
         } else if (r->reply != NULL && r->fn && r->fn->freeObject) {
             r->fn->freeObject(r->reply);
         }
@@ -1592,11 +1592,11 @@ int redisReaderGetReply(redisReader *r, redisReply **reply) {
     return REDIS_OK;
 }
 
-void redisReplyFree(redisReply *reply) {
+void RedisReply_free(RedisReply_t *reply) {
 	freeReplyObject(reply);
 }
 
-int redisvFormatCommand(char **target, const char *format, va_list ap) {
+int RedisCommand_vformat(char **target, const char *format, va_list ap) {
     const char *c = format;
     char *cmd = NULL; /* final command */
     int pos; /* position in final command */
@@ -1838,11 +1838,11 @@ cleanup:
  * len = redisFormatCommand(target, "GET %s", mykey);
  * len = redisFormatCommand(target, "SET %s %b", mykey, myval, myvallen);
  */
-int redisFormatCommand(char **target, const char *format, ...) {
+int RedisCommand_format(char **target, const char *format, ...) {
     va_list ap;
     int len;
     va_start(ap,format);
-    len = redisvFormatCommand(target,format,ap);
+    len = RedisCommand_vformat(target,format,ap);
     va_end(ap);
 
     /* The API says "-1" means bad result, but we now also return "-2" in some
@@ -1858,7 +1858,7 @@ int redisFormatCommand(char **target, const char *format, ...) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-size_t redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
+size_t RedisCommand_format_argv(char **target, int argc, const char **argv, const size_t *argvlen) {
     char *cmd = NULL; /* final command */
     size_t pos; /* position in final command */
     size_t len, totlen;
@@ -1896,7 +1896,7 @@ size_t redisFormatCommandArgv(char **target, int argc, const char **argv, const 
     return totlen;
 }
 
-void redisFreeCommand(char *target) {
+void RedisCommand_free(char *target) {
     hi_free(target);
 }
 

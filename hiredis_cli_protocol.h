@@ -92,16 +92,16 @@
 #define REDIS_REPLY_VERB 14
 
 /* Structure pointing to our actually configured allocators */
-typedef struct hiredisAllocFuncs {
+typedef struct RedisProtocolAllocFuncs_t {
     void *(*mallocFn)(size_t);
     void *(*callocFn)(size_t,size_t);
     void *(*reallocFn)(void*,size_t);
     char *(*strdupFn)(const char*);
     void (*freeFn)(void*);
-} hiredisAllocFuncs;
+} RedisProtocolAllocFuncs_t;
 
 /* This is the reply object */
-typedef struct redisReply {
+typedef struct RedisReply_t {
     int type; /* REDIS_REPLY_* */
     long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
     double dval; /* The double when type is REDIS_REPLY_DOUBLE */
@@ -112,13 +112,13 @@ typedef struct redisReply {
     char vtype[4]; /* Used for REDIS_REPLY_VERB, contains the null
                       terminated 3 character content type, such as "txt". */
     size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
-    struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
-} redisReply;
+    struct RedisReply_t **element; /* elements vector for REDIS_REPLY_ARRAY */
+} RedisReply_t;
 
-struct redisReadTask; /* note: hide detail */
-struct redisReplyObjectFunctions; /* note: hide detail */
+struct RedisReplyReadTask_t; /* note: hide detail */
+struct RedisReplyObjectFunctions_t; /* note: hide detail */
 
-typedef struct redisReader {
+typedef struct RedisReplyReader_t {
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
 
@@ -128,33 +128,33 @@ typedef struct redisReader {
     size_t maxbuf; /* Max length of unused buffer */
     long long maxelements; /* Max multi-bulk elements */
 
-    struct redisReadTask **task;
+    struct RedisReplyReadTask_t **task;
     int tasks;
 
     int ridx; /* Index of current read task */
-    void *reply; /* Temporary reply pointer *//* default is struct redisReply */
+    void *reply; /* Temporary reply pointer *//* default is struct RedisReply_t */
 
-    const struct redisReplyObjectFunctions *fn;
+    const struct RedisReplyObjectFunctions_t *fn;
     void *privdata;
-} redisReader;
+} RedisReplyReader_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-__declspec_dll hiredisAllocFuncs hiredisSetAllocators(const hiredisAllocFuncs *ha);
-__declspec_dll void hiredisResetAllocators(void);
+__declspec_dll RedisProtocolAllocFuncs_t RedisProtocolAllocFuncs_set(const RedisProtocolAllocFuncs_t *ha);
+__declspec_dll void RedisProtocolAllocFuncs_reset(void);
 
-__declspec_dll redisReader *redisReaderCreate(void);
-__declspec_dll void redisReaderFree(redisReader *r);
-__declspec_dll int redisReaderFeed(redisReader *r, const char *buf, size_t len);
-__declspec_dll int redisReaderGetReply(redisReader *r, redisReply **reply);
-__declspec_dll void redisReplyFree(redisReply *reply);
+__declspec_dll RedisReplyReader_t *RedisReplyReader_create(void);
+__declspec_dll void RedisReplyReader_free(RedisReplyReader_t *r);
+__declspec_dll int RedisReplyReader_feed(RedisReplyReader_t *r, const char *buf, size_t len);
+__declspec_dll int RedisReplyReader_pop_reply(RedisReplyReader_t *r, RedisReply_t **reply);
+__declspec_dll void RedisReply_free(RedisReply_t *reply);
 
-__declspec_dll int redisvFormatCommand(char **target, const char *format, va_list ap);
-__declspec_dll int redisFormatCommand(char **target, const char *format, ...);
-__declspec_dll size_t redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
-__declspec_dll void redisFreeCommand(char *target);
+__declspec_dll int RedisCommand_vformat(char **target, const char *format, va_list ap);
+__declspec_dll int RedisCommand_format(char **target, const char *format, ...);
+__declspec_dll size_t RedisCommand_format_argv(char **target, int argc, const char **argv, const size_t *argvlen);
+__declspec_dll void RedisCommand_free(char *target);
 
 #ifdef __cplusplus
 }
