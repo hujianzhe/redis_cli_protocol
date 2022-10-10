@@ -159,7 +159,7 @@ __declspec_dll void redisReplyFree(redisReply *reply);
 
 __declspec_dll int redisvFormatCommand(char **target, const char *format, va_list ap);
 __declspec_dll int redisFormatCommand(char **target, const char *format, ...);
-__declspec_dll long long redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
+__declspec_dll size_t redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
 __declspec_dll void redisFreeCommand(char *target);
 
 #ifdef __cplusplus

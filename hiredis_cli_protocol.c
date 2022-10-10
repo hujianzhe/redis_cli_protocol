@@ -1862,7 +1862,7 @@ int redisFormatCommand(char **target, const char *format, ...) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-long long redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
+size_t redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
     char *cmd = NULL; /* final command */
     size_t pos; /* position in final command */
     size_t len, totlen;
