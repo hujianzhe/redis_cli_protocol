@@ -6,6 +6,7 @@ tags
 /.vs
 /Debug
 /x64
+*.VC.*
 *.vc.db
 *.sln
 *.vcxproj

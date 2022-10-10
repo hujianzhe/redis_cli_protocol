@@ -46,6 +46,11 @@
 #define	_CRT_SECURE_NO_WARNINGS
 #endif
 
+#pragma warning(disable:4146)
+#pragma warning(disable:4244)
+#pragma warning(disable:4267)
+#pragma warning(disable:4996)
+
 #define __attribute__(x)
 #define SDS_SSIZE_MAX (LLONG_MAX >> 1) /* why >> 1 ??? */
 
@@ -931,7 +936,7 @@ static int processBulkItem(redisReader *r) {
     void *obj = NULL;
     char *p, *s;
     long long len;
-    unsigned long bytelen;
+    unsigned long long bytelen;
     int success = 0;
 
     p = r->buf+r->pos;
