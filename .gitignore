@@ -3,3 +3,10 @@
 *.so
 tags
 /*.dSYM
+/.vs
+/Debug
+/x64
+*.vc.db
+*.sln
+*.vcxproj
+*.vcxproj.*

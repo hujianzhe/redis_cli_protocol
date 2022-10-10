@@ -42,6 +42,10 @@
 
 #ifdef _MSC_VER
 
+#ifndef	_CRT_SECURE_NO_WARNINGS
+#define	_CRT_SECURE_NO_WARNINGS
+#endif
+
 #define __attribute__(x)
 #define SDS_SSIZE_MAX (LLONG_MAX >> 1) /* why >> 1 ??? */
 
@@ -542,9 +546,9 @@ static int sdsrange(char* s, intptr_t start, intptr_t end) {
     }
     newlen = (start > end) ? 0 : (end-start)+1;
     if (newlen != 0) {
-        if (start >= (ssize_t)len) {
+        if (start >= (intptr_t)len) {
             newlen = 0;
-        } else if (end >= (ssize_t)len) {
+        } else if (end >= (intptr_t)len) {
             end = len-1;
             newlen = (start > end) ? 0 : (end-start)+1;
         }
